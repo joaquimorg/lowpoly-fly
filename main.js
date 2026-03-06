@@ -9,7 +9,11 @@ scene.fog = new THREE.Fog('#A8BCCC', 200, 2500);
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 3000);
 camera.position.set(0, 100, 0);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    logarithmicDepthBuffer: true,
+    powerPreference: "high-performance"
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.autoClear = false; // Add autoClear = false so minimap can overlap
@@ -264,7 +268,8 @@ function animate() {
     // Small ambient wander so the flight isn't entirely straight in a flat valley
     let wanderVel = Math.sin(time * 0.5) * 15;
 
-    let targetVelX = wanderVel + avoidanceForce;
+    // Combine autopilot (avoidance) with user steering
+    let targetVelX = wanderVel + avoidanceForce + userSteer;
 
     // Interpolate horizontal speed extremely smoothly (sluggish movement)
     currentVelX += (targetVelX - currentVelX) * 0.4 * delta;
@@ -378,13 +383,13 @@ function animate() {
     minimapCamera.position.x = cameraX;
     minimapCamera.position.z = cameraZ - 800; // Look ahead to avoid empty recycled spots
 
-    const minimapSize = 200;
-    const padding = 25; // Matching CSS bottom/right
-    const mapX = window.innerWidth - minimapSize - padding;
-    const mapY = padding; // WebGL viewport coordinates start from bottom-left
+    const minimapScale = window.innerWidth <= 768 ? 120 : 180;
+    const padding = window.innerWidth <= 768 ? 15 : 20;
+    const mapX = window.innerWidth - minimapScale - padding;
+    const mapY = padding;
 
-    renderer.setViewport(mapX, mapY, minimapSize, minimapSize);
-    renderer.setScissor(mapX, mapY, minimapSize, minimapSize);
+    renderer.setViewport(mapX, mapY, minimapScale, minimapScale);
+    renderer.setScissor(mapX, mapY, minimapScale, minimapScale);
     renderer.setScissorTest(true);
 
     // Clear everything so minimap respects its own drawing stack
@@ -408,12 +413,76 @@ function animate() {
     }
 }
 
+// ---------- INTERACTION & MOBILE ----------
+let touchStartX = 0;
+let userSteer = 0;
+let isTouching = false;
+
+window.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    isTouching = true;
+}, { passive: true });
+
+window.addEventListener('touchmove', (e) => {
+    const touchX = e.touches[0].clientX;
+    const diff = touchX - touchStartX;
+    // Normalize steering force based on screen width
+    userSteer = (diff / window.innerWidth) * 400;
+}, { passive: true });
+
+window.addEventListener('touchend', () => {
+    userSteer = 0;
+    isTouching = false;
+});
+
+// Support for mouse "steering" too
+window.addEventListener('mousedown', (e) => {
+    touchStartX = e.clientX;
+    isTouching = true;
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!isTouching) return;
+    const diff = e.clientX - touchStartX;
+    userSteer = (diff / window.innerWidth) * 400;
+});
+
+window.addEventListener('mouseup', () => {
+    userSteer = 0;
+    isTouching = false;
+});
+
+// Update instructions on mobile
+if ('ontouchstart' in window) {
+    const p = document.querySelector('#hud p');
+    if (p) p.innerText = 'Tap and slide horizontally to steer.';
+}
+
 // Window resizing
 window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
+
+// Fullscreen support
+const fsBtn = document.getElementById('fullscreen-btn');
+if (fsBtn) {
+    fsBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.warn(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+            fsBtn.innerText = '⛶';
+        } else {
+            document.exitFullscreen();
+            fsBtn.innerText = '⟎';
+        }
+    });
+}
 
 // Start loop
 animate();

@@ -31,7 +31,7 @@ body {
 }
 
 #hud {
-    padding: 30px;
+    padding: 20px;
     color: #fff;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 100%);
@@ -40,13 +40,13 @@ body {
 
 #hud h1 {
     margin: 0;
-    font-size: 2rem;
+    font-size: 1.8rem;
     letter-spacing: 1px;
 }
 
 #hud p {
-    margin: 10px 0 0;
-    font-size: 1rem;
+    margin: 6px 0 0;
+    font-size: 0.9rem;
     opacity: 0.8;
 }
 
@@ -55,10 +55,9 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 40px;
-    height: 40px;
+    width: 30px;
+    height: 30px;
     opacity: 0.4;
-    /* simple airplane crosshair */
     background:
         linear-gradient(to right, transparent 48%, #fff 48%, #fff 52%, transparent 52%),
         linear-gradient(to bottom, transparent 48%, #fff 48%, #fff 52%, transparent 52%);
@@ -80,14 +79,13 @@ body {
 
 #minimap-container {
     position: absolute;
-    bottom: 25px;
-    right: 25px;
-    width: 200px;
-    height: 200px;
-    border: 3px solid rgba(255, 255, 255, 0.4);
+    bottom: 20px;
+    right: 20px;
+    width: 180px;
+    height: 180px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
     background-color: rgba(168, 188, 204, 0.2);
-    /* Semi-transparent sky color to see WebGL */
     box-sizing: border-box;
     overflow: hidden;
     pointer-events: none;
@@ -95,7 +93,7 @@ body {
 
 #minimap-blip-wrapper {
     position: absolute;
-    top: calc(50% + 80px);
+    top: calc(50% + 72px);
     left: 50%;
     width: 20px;
     height: 20px;
@@ -106,19 +104,92 @@ body {
 #minimap-blip {
     width: 0;
     height: 0;
-    border-left: 7px solid transparent;
-    border-right: 7px solid transparent;
-    border-bottom: 14px solid #ff3333;
-    margin: 3px auto;
-    /* Center it */
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 12px solid #ff3333;
+    margin: 4px auto;
 }
 
 #copyright {
     position: absolute;
-    bottom: 25px;
-    left: 30px;
+    bottom: 20px;
+    left: 20px;
     color: rgba(255, 255, 255, 0.6);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
     pointer-events: none;
+}
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 768px) {
+    #hud h1 {
+        font-size: 1.4rem;
+    }
+
+    #hud p {
+        font-size: 0.8rem;
+    }
+
+    #minimap-container {
+        width: 120px;
+        height: 120px;
+        bottom: 15px;
+        right: 15px;
+    }
+
+    #minimap-blip-wrapper {
+        top: calc(50% + 48px);
+    }
+
+    #copyright {
+        bottom: 15px;
+        left: 15px;
+        font-size: 0.7rem;
+    }
+
+    #crosshair {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+@media (orientation: portrait) {
+    #hud {
+        padding-top: 50px;
+        /* Leave space for status bar / notch */
+    }
+}
+
+#fullscreen-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: background 0.2s;
+    backdrop-filter: blur(5px);
+}
+
+#fullscreen-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 768px) {
+    #fullscreen-btn {
+        top: 15px;
+        right: 15px;
+        width: 38px;
+        height: 38px;
+        font-size: 1.2rem;
+    }
 }
