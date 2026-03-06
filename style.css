@@ -1,0 +1,124 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #A8BCCC;
+    /* Sky color */
+    font-family: 'Inter', sans-serif;
+    user-select: none;
+}
+
+#app {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+}
+
+#ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10;
+    pointer-events: none;
+    /* Let clicks pass through if needed */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+#hud {
+    padding: 30px;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 100%);
+    animation: fadeIn 2s ease-out forwards;
+}
+
+#hud h1 {
+    margin: 0;
+    font-size: 2rem;
+    letter-spacing: 1px;
+}
+
+#hud p {
+    margin: 10px 0 0;
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    opacity: 0.4;
+    /* simple airplane crosshair */
+    background:
+        linear-gradient(to right, transparent 48%, #fff 48%, #fff 52%, transparent 52%),
+        linear-gradient(to bottom, transparent 48%, #fff 48%, #fff 52%, transparent 52%);
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#minimap-container {
+    position: absolute;
+    bottom: 25px;
+    right: 25px;
+    width: 200px;
+    height: 200px;
+    border: 3px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    background-color: rgba(168, 188, 204, 0.2);
+    /* Semi-transparent sky color to see WebGL */
+    box-sizing: border-box;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+#minimap-blip-wrapper {
+    position: absolute;
+    top: calc(50% + 80px);
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin-left: -10px;
+    margin-top: -10px;
+}
+
+#minimap-blip {
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 14px solid #ff3333;
+    margin: 3px auto;
+    /* Center it */
+}
+
+#copyright {
+    position: absolute;
+    bottom: 25px;
+    left: 30px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+}
