@@ -2,6 +2,8 @@
 
 A continuous, low-poly flight simulation built with Three.js and Simplex Noise. Experience a relaxing journey over an infinite landscape of snow-capped mountains, deep valleys, and serene lakes.
 
+<img src="fly.png" alt="Procedural Flight Simulation" />
+
 ## 🚀 Features
 
 - **Infinite Procedural Terrain**: Dynamically generated using multi-octave Simplex Noise and a chunk-recycling system for seamless, endless flight.
