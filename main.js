@@ -204,20 +204,106 @@ waterMesh.frustumCulled = false;
 scene.add(waterMesh);
 
 
+// ---------- AIRCRAFT MODEL ----------
+// Low-poly single-engine prop plane, built from primitives.
+const planeGroup = new THREE.Group();
+
+const bodyMat = new THREE.MeshStandardMaterial({ color: '#E8E8EC', flatShading: true, roughness: 0.6, metalness: 0.2 });
+const accentMat = new THREE.MeshStandardMaterial({ color: '#C0392B', flatShading: true, roughness: 0.6, metalness: 0.2 });
+const glassMat = new THREE.MeshStandardMaterial({ color: '#2C3E50', flatShading: true, roughness: 0.2, metalness: 0.4 });
+const propMat = new THREE.MeshStandardMaterial({ color: '#33373B', flatShading: true, roughness: 0.8 });
+
+// Fuselage (nose points toward -Z, the direction of travel)
+const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.1, 13, 8), bodyMat);
+fuselage.rotation.x = Math.PI / 2;
+planeGroup.add(fuselage);
+
+// Nose cone
+const nose = new THREE.Mesh(new THREE.ConeGeometry(1.7, 3, 8), accentMat);
+nose.rotation.x = -Math.PI / 2;
+nose.position.z = -7.8;
+planeGroup.add(nose);
+
+// Canopy
+const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 6), glassMat);
+canopy.scale.set(1, 0.7, 1.6);
+canopy.position.set(0, 1.1, -1.5);
+planeGroup.add(canopy);
+
+// Main wing
+const wing = new THREE.Mesh(new THREE.BoxGeometry(22, 0.5, 4.2), bodyMat);
+wing.position.set(0, 0.2, -1);
+planeGroup.add(wing);
+const wingStripe = new THREE.Mesh(new THREE.BoxGeometry(22, 0.52, 1), accentMat);
+wingStripe.position.set(0, 0.21, 0.4);
+planeGroup.add(wingStripe);
+
+// Tailplane + fin
+const tailWing = new THREE.Mesh(new THREE.BoxGeometry(8, 0.4, 2.4), bodyMat);
+tailWing.position.set(0, 0.4, 6);
+planeGroup.add(tailWing);
+const tailFin = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.2, 2.6), accentMat);
+tailFin.position.set(0, 1.9, 6.2);
+planeGroup.add(tailFin);
+
+// Fixed landing gear
+const gearMat = propMat;
+for (const gx of [-2.6, 2.6]) {
+    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.2, 5), gearMat);
+    strut.position.set(gx, -1.4, -1);
+    planeGroup.add(strut);
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.5, 8), gearMat);
+    wheel.rotation.z = Math.PI / 2;
+    wheel.position.set(gx, -2.4, -1);
+    planeGroup.add(wheel);
+}
+
+// Propeller (spins around Z)
+const propeller = new THREE.Group();
+const blade = new THREE.Mesh(new THREE.BoxGeometry(0.4, 8, 0.5), propMat);
+propeller.add(blade);
+const blade2 = blade.clone();
+blade2.rotation.z = Math.PI / 2;
+propeller.add(blade2);
+const hub = new THREE.Mesh(new THREE.SphereGeometry(0.6, 6, 6), accentMat);
+propeller.add(hub);
+propeller.position.z = -9.3;
+planeGroup.add(propeller);
+// Faint spinning disc to suggest motion blur
+const propDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(4, 16),
+    new THREE.MeshBasicMaterial({ color: '#bfc4c8', transparent: true, opacity: 0.12, side: THREE.DoubleSide })
+);
+propDisc.position.z = -9.4;
+planeGroup.add(propDisc);
+
+planeGroup.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+planeGroup.position.set(0, 150, 0);
+scene.add(planeGroup);
+
 // ---------- MINIMAP SETUP ----------
 const minimapCamera = new THREE.OrthographicCamera(-1000, 1000, 1000, -1000, 100, 4000);
 minimapCamera.position.y = 1500;
 minimapCamera.rotation.x = -Math.PI / 2;
 
 // ---------- FLIGHT PHYSICS ----------
-let cameraZ = 200;
-let cameraX = 0;
-const speed = 110; // Reduced flight speed for calmer flight
+let cameraZ = 200;   // plane world Z (nose points toward -Z)
+let cameraX = 0;      // plane world X
+let planeY = 150;     // plane world Y
+let cruiseAlt = 150;  // altitude the autopilot holds; only changes to clear terrain
+
+const CRUISE_SPEED = 105; // target airspeed in level flight
+let airspeed = CRUISE_SPEED;
 
 let roll = 0;
 let pitch = 0;
 let yaw = 0;
 let currentVelX = 0; // Added persistent horizontal velocity
+
+let propSpin = 0;
+
+// Chase camera starts behind and above the aircraft
+camera.position.set(0, planeY + 11, cameraZ + 36);
 
 const clock = new THREE.Clock();
 
@@ -227,8 +313,16 @@ function animate() {
     const delta = Math.min(clock.getDelta(), 0.1);
     const time = clock.getElapsedTime();
 
-    // 1. Move plane forward continuously
-    cameraZ -= speed * delta;
+    // 1. Airspeed dynamics: engine seeks cruise, gravity trades altitude for speed.
+    //    Climbing (nose up, pitch > 0) bleeds energy; diving builds it.
+    const gravityAccel = Math.sin(pitch) * 140;
+    const engineAccel = (CRUISE_SPEED - airspeed) * 0.6;
+    airspeed += (engineAccel - gravityAccel) * delta;
+    airspeed = Math.max(45, Math.min(230, airspeed));
+
+    // Move plane forward along its heading
+    cameraZ -= airspeed * Math.cos(yaw) * delta;
+    cameraX += -airspeed * Math.sin(yaw) * delta;
 
     // 2. Horizontal Flight & Dodge Logic
     // Look ahead to evaluate terrain obstacles by sampling several distances
@@ -260,60 +354,134 @@ function animate() {
     if (avgHLeft > 90) avoidanceForce += (avgHLeft - 80) * 0.8;
     if (avgHRight > 90) avoidanceForce -= (avgHRight - 80) * 0.8;
 
-    // Soft bounds to keep plane inside the terrain mesh (CHUNK_WIDTH/2 = 2000)
-    // We gently bounce it back if it tries to fly further than +-1200 from center
-    if (cameraX > 1200) avoidanceForce -= (cameraX - 1200) * 1.5;
-    if (cameraX < -1200) avoidanceForce += (-1200 - cameraX) * 1.5;
+    // --- Map edge containment ---------------------------------------------
+    // The terrain mesh is CHUNK_WIDTH wide (half = 2000). Keep the plane well
+    // inside it: an ever-firmer push back past SOFT_EDGE, and a hard wall at
+    // HARD_EDGE that the plane can never cross.
+    const MAP_HALF = CHUNK_WIDTH / 2;  // 2000
+    const SOFT_EDGE = MAP_HALF - 950;  // 1050 — start easing back here (lots of room)
+    const HARD_EDGE = MAP_HALF - 250;  // 1750 — absolute limit
 
-    // Small ambient wander so the flight isn't entirely straight in a flat valley
-    let wanderVel = Math.sin(time * 0.5) * 15;
+    let edgeFactor = 0; // 0 = safe, 1 = at the hard wall
+    if (Math.abs(cameraX) > SOFT_EDGE) {
+        edgeFactor = Math.min(1, (Math.abs(cameraX) - SOFT_EDGE) / (HARD_EDGE - SOFT_EDGE));
+        // Gentle, capped nudge back toward the centre — eases in with edgeFactor².
+        avoidanceForce -= Math.sign(cameraX) * edgeFactor * edgeFactor * 80;
+    }
+
+    // Small ambient wander so the flight isn't entirely straight in a flat valley,
+    // faded out as we approach the edge.
+    let wanderVel = Math.sin(time * 0.5) * 15 * (1 - edgeFactor);
+
+    // Suppress steering/wander that pushes further toward the edge we're near.
+    let steer = userSteer;
+    if (edgeFactor > 0) {
+        const outward = cameraX > 0 ? 1 : -1;
+        if (Math.sign(steer) === outward) steer *= (1 - edgeFactor);
+        if (Math.sign(wanderVel) === outward) wanderVel *= (1 - edgeFactor);
+    }
 
     // Combine autopilot (avoidance) with user steering
-    let targetVelX = wanderVel + avoidanceForce + userSteer;
+    let targetVelX = wanderVel + avoidanceForce + steer;
 
-    // Interpolate horizontal speed extremely smoothly (sluggish movement)
-    currentVelX += (targetVelX - currentVelX) * 0.4 * delta;
+    // Interpolate horizontal speed smoothly. Stays sluggish in open air; only
+    // firms up as we near the edge so the turn-back doesn't feel abrupt.
+    const velLerp = Math.min(1, (0.5 + 1.6 * edgeFactor) * delta);
+    currentVelX += (targetVelX - currentVelX) * velLerp;
     cameraX += currentVelX * delta;
 
-    // 3. Vertical Terrain Avoidance 
+    // Hard wall: never leave the meshed terrain.
+    if (cameraX > HARD_EDGE) { cameraX = HARD_EDGE; if (currentVelX > 0) currentVelX = 0; }
+    if (cameraX < -HARD_EDGE) { cameraX = -HARD_EDGE; if (currentVelX < 0) currentVelX = 0; }
+
+    // 3. Vertical guidance — hold altitude; only climb/descend when terrain forces it.
     const hBelow = generateHeight(cameraX, cameraZ);
 
-    // Look ahead for climbing, sample several points to catch upcoming sharp cliffs
+    // Scan the path ahead (along the heading the plane is actually steering toward)
+    // for the highest ground it will have to cross.
     let maxHAhead = hBelow;
-    for (let i = 1; i <= 3; i++) {
-        const dz = cameraZ - (i * 250);
-        const h = generateHeight(cameraX, dz);
+    const lateralDrift = THREE.MathUtils.clamp(currentVelX * 2.5, -320, 320);
+    for (let i = 1; i <= 6; i++) {
+        const dz = cameraZ - (i * 260);              // up to ~1560 units ahead
+        const dx = cameraX + lateralDrift * (i / 6); // account for where steering is taking us
+        const h = generateHeight(dx, dz);
         if (h > maxHAhead) maxHAhead = h;
     }
 
-    // We want to fly safely above the ground
-    let idealY = Math.max(hBelow + 80, maxHAhead + 100);
-    idealY = Math.max(idealY, 150); // Minimum flight altitude
+    const CLEARANCE = 105;          // how far above ground we insist on being
+    const floorAlt = hBelow + 70;   // never get closer than this to the ground right under us
 
-    // Smoothly interpolate camera Y towards the ideal Y (slow vertical climb)
-    camera.position.y += (idealY - camera.position.y) * 0.5 * delta;
-    camera.position.x = cameraX;
-    camera.position.z = cameraZ;
+    // Can the plane realistically dodge instead of climb? Only if there's a clear
+    // lateral gap: at least one side markedly lower than the obstacle ahead.
+    const dodgeable = Math.min(avgHLeft, avgHRight) < avgHCenter - 35 &&
+                      Math.min(avgHLeft, avgHRight) + CLEARANCE < cruiseAlt + 20;
 
-    // 4. Calculate realistic plane rotations
-    // Bank (Roll) naturally maps to horizontal velocity now
-    const targetRoll = -currentVelX * 0.005; // Bank softly
-    // Restrict maximum roll so it doesn't look acrobatic
-    const clampedRoll = Math.max(-0.25, Math.min(0.25, targetRoll));
-    roll += (clampedRoll - roll) * 0.8 * delta;
+    const neededAlt = maxHAhead + CLEARANCE;
+    if (neededAlt > cruiseAlt && !dodgeable) {
+        // Obstacle we can't sidestep — pull up, fairly promptly.
+        cruiseAlt += (neededAlt - cruiseAlt) * 1.6 * delta;
+    } else if (neededAlt > cruiseAlt && dodgeable) {
+        // We'll go around it: only a mild bump if the peak is really tall.
+        const softTarget = Math.min(neededAlt, cruiseAlt + 45);
+        cruiseAlt += (softTarget - cruiseAlt) * 0.4 * delta;
+    } else if (cruiseAlt - neededAlt > 90 && cruiseAlt - floorAlt > 60) {
+        // Terrain has dropped well away and we're higher than needed — sink back
+        // toward a comfortable cruising height, but very slowly (no bobbing).
+        const relaxTarget = Math.max(neededAlt, floorAlt, 150);
+        cruiseAlt += (relaxTarget - cruiseAlt) * 0.12 * delta;
+    }
+    // otherwise: hold altitude (dead-band) — this is the common case over rough ground.
 
-    // Pitch depending on vertical velocity
-    const velY = (idealY - camera.position.y);
-    const targetPitch = velY * 0.003;
-    // Restrict pitch so the plane doesn't point sharply up
-    const clampedPitch = Math.max(-0.2, Math.min(0.2, targetPitch));
-    pitch += (clampedPitch - pitch) * 0.8 * delta;
+    cruiseAlt = Math.max(cruiseAlt, floorAlt, 150);
 
-    // Yaw to slightly face the direction of movement
-    const targetYaw = -currentVelX * 0.001;
-    yaw += (targetYaw - yaw) * 0.8 * delta;
+    // Atmospheric turbulence — attitude buffeting only; keep it off the altitude.
+    const turbP = noise2D(time * 0.55, 17.2) * 0.04;
+    const turbR = noise2D(time * 0.73, 91.6) * 0.055;
+    const turbY = noise2D(time * 0.37, 133.7) * 1.1; // barely-there vertical breathing
 
-    camera.rotation.set(pitch, yaw, roll, 'YXZ'); // Order matters for flight
+    // Track the held altitude smoothly ("heavy" vertical response)
+    const prevY = planeY;
+    planeY += (cruiseAlt + turbY - planeY) * 0.9 * delta;
+    const climbRate = (planeY - prevY) / Math.max(delta, 0.0001);
+
+    // 4. Realistic airframe attitude — smooth, gentle responses.
+    // Bank into the turn (roll follows lateral velocity), coordinated.
+    const targetRoll = THREE.MathUtils.clamp(-currentVelX * 0.007, -0.38, 0.38) + turbR;
+    roll += (targetRoll - roll) * 1.8 * delta;
+
+    // Pitch follows climb/descent rate — nose points where the plane is going.
+    const targetPitch = THREE.MathUtils.clamp(climbRate * 0.0035, -0.22, 0.26) + turbP;
+    pitch += (targetPitch - pitch) * 1.8 * delta;
+
+    // Yaw slowly aligns the nose with the flight path (adverse-yaw feel).
+    const targetYaw = -currentVelX * 0.0014;
+    yaw += (targetYaw - yaw) * 1.3 * delta;
+
+    // Position + orient the visible aircraft
+    planeGroup.position.set(cameraX, planeY, cameraZ);
+    planeGroup.rotation.set(pitch, yaw, roll, 'YXZ');
+
+    // Spinning propeller (rate scales with airspeed), plus a shimmering disc.
+    propSpin += airspeed * 0.14 * delta * 60;
+    propeller.rotation.z = propSpin;
+    propDisc.material.opacity = 0.06 + Math.min(0.14, airspeed / 1600);
+
+    // 4b. Spring-lag chase camera sitting behind and above the tail.
+    const camBack = 52, camUp = 15;
+    const desiredX = cameraX + Math.sin(yaw) * camBack;
+    const desiredZ = cameraZ + Math.cos(yaw) * camBack;
+    const desiredY = planeY + camUp + Math.sin(pitch) * -14;
+    const camLerp = 1 - Math.pow(0.0009, delta);
+    camera.position.x += (desiredX - camera.position.x) * camLerp;
+    camera.position.y += (desiredY - camera.position.y) * camLerp;
+    camera.position.z += (desiredZ - camera.position.z) * camLerp;
+    camera.lookAt(cameraX - Math.sin(yaw) * 12, planeY + 3, cameraZ - Math.cos(yaw) * 12);
+    camera.rotateZ(roll * 0.35); // let the horizon tilt slightly with the bank
+
+    // Speed sensation: FOV widens as the plane accelerates.
+    const targetFov = 55 + (airspeed - CRUISE_SPEED) * 0.09;
+    camera.fov += (targetFov - camera.fov) * 0.04;
+    camera.updateProjectionMatrix();
 
     // 5. Chunk Recycling
     for (const chunk of chunks) {
@@ -411,7 +579,24 @@ function animate() {
         // while 3D space Yaw is standard Math (positive counter-clockwise)
         blipWrapper.style.transform = `rotate(${-yaw}rad)`;
     }
+
+    // --- 4. Instrument readout ---
+    if (instrumentEl) {
+        const alt = Math.round((planeY - generateHeight(cameraX, cameraZ)) * 3.3); // "feet" AGL
+        const kts = Math.round(airspeed * 0.9);
+        instrumentEl.textContent = `SPD ${kts} kt   ·   ALT ${alt} ft AGL`;
+    }
 }
+
+// Lightweight instrument strip
+const instrumentEl = document.createElement('div');
+instrumentEl.id = 'instruments';
+instrumentEl.style.cssText =
+    'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);' +
+    'font:700 13px/1 Inter,system-ui,sans-serif;letter-spacing:1px;color:#f4f6f8;' +
+    'background:rgba(20,28,36,0.42);padding:8px 16px;border-radius:20px;' +
+    'backdrop-filter:blur(4px);pointer-events:none;z-index:20;white-space:nowrap';
+document.body.appendChild(instrumentEl);
 
 // ---------- INTERACTION & MOBILE ----------
 let touchStartX = 0;
@@ -451,6 +636,10 @@ window.addEventListener('mouseup', () => {
     userSteer = 0;
     isTouching = false;
 });
+
+// Third-person view now shows the aircraft, so the crosshair is redundant.
+const crosshairEl = document.getElementById('crosshair');
+if (crosshairEl) crosshairEl.style.display = 'none';
 
 // Update instructions on mobile
 if ('ontouchstart' in window) {
